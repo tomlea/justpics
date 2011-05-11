@@ -18,7 +18,7 @@ class Justpics < Sinatra::Base
   end
 
   post "/" do
-    file = params[:file]
+    file = params[:file] || params[:media]
 
     unless file and tmpfile = file[:tempfile]
       status 510
@@ -36,7 +36,12 @@ class Justpics < Sinatra::Base
     AWS::S3::S3Object.store(id, tmpfile, BUCKET_NAME, :content_type => params[:file][:type])
 
     resource_url = url("/#{id}")
-    redirect resource_url
+
+    if params[:source]
+      "<mediaurl>#{resource_url}</mediaurl>"
+    else
+      redirect resource_url
+    end
   end
 
   get "/:id" do
