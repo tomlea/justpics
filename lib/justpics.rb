@@ -38,7 +38,7 @@ class Justpics < Sinatra::Base
 
     resource_url = url("/#{id}")
 
-    if params[:source]
+    if params[:media]
       "<mediaurl>#{resource_url}</mediaurl>"
     else
       redirect resource_url
