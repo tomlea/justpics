@@ -8,6 +8,8 @@ AWS::S3::Base.establish_connection!(
 )
 
 class Justpics < Sinatra::Base
+  MAX_SIZE = (ENV['JUSTPICS_MAX_SIZE'] || 2 * 1024 * 1024).to_i
+
   enable :static, :methodoverride
 
   get "/" do
@@ -15,14 +17,23 @@ class Justpics < Sinatra::Base
   end
 
   post "/" do
-    unless params[:file] && (tmpfile = params[:file][:tempfile]) && (name = params[:file][:filename])
+    file = params[:file]
+
+    unless file and tmpfile = file[:tempfile]
       status 510
       return "No file selected"
     end
+
+    if tmpfile.size > MAX_SIZE
+      status 510
+      return "File too large. Keep it under #{MAX_SIZE} bytes."
+    end
+
     id = Digest::SHA1.file(tmpfile.path).hexdigest
 
     AWS::S3::S3Object.store(id, tmpfile, 'justpics', :content_type => params[:file][:type])
-    redirect "/#{id}"
+    resource_url = url("/#{id}")
+    redirect resource_url
   end
 
   get "/:id" do
