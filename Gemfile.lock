@@ -7,10 +7,10 @@ GEM
       xml-simple
     builder (2.1.2)
     mime-types (1.16)
-    rack (1.2.1)
-    sinatra (1.1.0)
+    rack (1.2.2)
+    sinatra (1.2.2)
       rack (~> 1.1)
-      tilt (~> 1.1)
+      tilt (>= 1.2.2, < 2.0)
     tilt (1.2.2)
     xml-simple (1.0.14)
 
@@ -19,4 +19,4 @@ PLATFORMS
 
 DEPENDENCIES
   aws-s3
-  sinatra
+  sinatra (~> 1.2)
