@@ -21,14 +21,14 @@ class Justpics < Sinatra::Base
     end
     id = Digest::SHA1.file(tmpfile.path).hexdigest
 
-    AWS::S3::S3Object.store(id, tmpfile, 'justpics', :content_type => params[:file][:type])
+    AWS::S3::S3Object.store(id, tmpfile, ENV["AMAZON_S3_BUCKET"], :content_type => params[:file][:type])
     redirect "/#{id}"
   end
 
   get "/:id" do
     id = params[:id].to_s[0...40]
     begin
-      file = AWS::S3::S3Object.find(id, 'justpics')
+      file = AWS::S3::S3Object.find(id, ENV["AMAZON_S3_BUCKET"])
       content_type file.content_type
 
       response['Cache-Control'] = "public, max-age=#{60*60*24*356*3}"
