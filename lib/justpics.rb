@@ -32,8 +32,9 @@ class Justpics < Sinatra::Base
 
     id = Digest::SHA1.file(tmpfile.path).hexdigest
 
-    AWS::S3::S3Object.exists?(id, BUCKET_NAME)
-    AWS::S3::S3Object.store(id, tmpfile, BUCKET_NAME, :content_type => file[:type])
+    unless AWS::S3::S3Object.exists?(id, BUCKET_NAME)
+      AWS::S3::S3Object.store(id, tmpfile, BUCKET_NAME, :content_type => file[:type])
+    end
 
     resource_url = url("/#{id}")
 
