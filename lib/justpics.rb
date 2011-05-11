@@ -48,7 +48,6 @@ class Justpics < Sinatra::Base
     end
 
     def call(env)
-      p env
       if (env["HTTP_IF_MODIFIED_SINCE"] or env["HTTP_IF_NONE_MATCH"]) and env["REQUEST_METHOD"] == "GET" and env["REQUEST_PATH"].length > 40
         [304, {}, []]
       else
