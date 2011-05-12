@@ -10,14 +10,15 @@ AWS::S3::Base.establish_connection!(
 class Justpics < Sinatra::Base
   BUCKET_NAME = ENV['AMAZON_S3_BUCKET']
   MAX_SIZE = (ENV['JUSTPICS_MAX_SIZE'] || 2 * 1024 * 1024).to_i
+  POST_PATH = "/#{ENV["JUSTPICS_POST_PATH"]}".gsub(%r{//+}, "/")
 
   enable :static, :methodoverride
 
-  get "/" do
+  get POST_PATH do
     File.read(File.expand_path("../../public/index.html", __FILE__))
   end
 
-  post "/" do
+  post POST_PATH do
     file = params[:file] || params[:media]
 
     unless file and tmpfile = file[:tempfile]
