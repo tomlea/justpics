@@ -74,7 +74,8 @@ class Justpics < Sinatra::Base
     keys = get_keys_starting_with(key[0...MINIMUM_KEY_LENGTH]) - [key]
     MINIMUM_KEY_LENGTH.upto(key.length) do |length|
       candidate = key[0...length]
-      return candidate if keys.grep(/^#{candidate}/).empty?
+      keys = keys.grep(/^#{candidate}/)
+      return candidate if keys.empty?
     end
     key 
   end
