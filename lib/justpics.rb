@@ -12,6 +12,8 @@ class Justpics < Sinatra::Base
   MAX_SIZE = (ENV['JUSTPICS_MAX_SIZE'] || 2 * 1024 * 1024).to_i
   POST_PATH = "/#{ENV["JUSTPICS_POST_PATH"]}".gsub(%r{//+}, "/")
   MINIMUM_KEY_LENGTH = (ENV['JUSTPICS_MINIMUM_KEY_LENGTH'] || 40).to_i
+  MINIMUM_KEY_LENGTH > 0 or raise ArgumentError, "JUSTPICS_MINIMUM_KEY_LENGTH must be above 0, otherwise where would the home page go?!?"
+  MINIMUM_KEY_LENGTH <= 40 or raise ArgumentError, "JUSTPICS_MINIMUM_KEY_LENGTH cannot be bigger then the full key length (40)"
 
   NotFound = Class.new(RuntimeError)
 
