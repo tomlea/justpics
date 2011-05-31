@@ -55,19 +55,31 @@ class Justpics < Sinatra::Base
   get "/:id" do
     id = params[:id].to_s[/^[a-zA-Z0-9]*/]
     begin
-      raise NotFound unless sha = expand_sha(id)
-      file = AWS::S3::S3Object.find(sha, BUCKET_NAME)
-      content_type file.content_type
-
-      response['Cache-Control'] = "public, max-age=#{60*60*24*356*3}"
-      response['ETag'] = "the-same-thing-every-time"
-      response['Last-Modified'] = Time.at(1337).httpdate
-
-      file.value
-    rescue AWS::S3::NoSuchKey, NotFound
+      cache_forever
+      render_image(id)
+    rescue NotFound
       status 404
-      "Not here"
+      render_default
     end
+  end
+
+  def cache_forever
+    response['Cache-Control'] = "public, max-age=#{60*60*24*356*3}"
+    response['ETag'] = "the-same-thing-every-time"
+    response['Last-Modified'] = Time.at(1337).httpdate
+  end
+
+  def render_image(id)
+    raise NotFound unless sha = expand_sha(id)
+    file = AWS::S3::S3Object.find(sha, BUCKET_NAME)
+    content_type file.content_type
+    file.value
+  rescue AWS::S3::NoSuchKey => e
+    raise NotFound, e.message
+  end
+
+  def render_default
+    send_file File.expand_path('../../assets/default.png', __FILE__)
   end
 
   def find_short_key_for(key)
