@@ -52,7 +52,7 @@ class Justpics < Sinatra::Base
     end
   end
 
-  get "/:id" do
+  get "/:id*" do
     id = params[:id].to_s[/^[a-zA-Z0-9]*/]
     begin
       cache_forever
