@@ -73,7 +73,7 @@ class Justpics < Sinatra::Base
     raise NotFound unless sha = expand_sha(id)
     file = AWS::S3::S3Object.find(sha, BUCKET_NAME)
     content_type file.content_type
-    file.value
+    Enumerable::Enumerator.new(file, :value)
   rescue AWS::S3::NoSuchKey => e
     raise NotFound, e.message
   end
