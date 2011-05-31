@@ -11,6 +11,9 @@ class Justpics < Sinatra::Base
   BUCKET_NAME = ENV['AMAZON_S3_BUCKET']
   MAX_SIZE = (ENV['JUSTPICS_MAX_SIZE'] || 2 * 1024 * 1024).to_i
   POST_PATH = "/#{ENV["JUSTPICS_POST_PATH"]}".gsub(%r{//+}, "/")
+  MINIMUM_KEY_LENGTH = (ENV['JUSTPICS_MINIMUM_KEY_LENGTH'] || 40).to_i
+
+  NotFound = Class.new(RuntimeError)
 
   enable :static, :methodoverride
 
@@ -37,7 +40,8 @@ class Justpics < Sinatra::Base
       AWS::S3::S3Object.store(id, tmpfile, BUCKET_NAME, :content_type => file[:type])
     end
 
-    resource_url = url("/#{id}")
+    short_key = find_short_key_for(id)
+    resource_url = url("/#{short_key}")
 
     if params[:media]
       "<mediaurl>#{resource_url}</mediaurl>"
@@ -47,9 +51,10 @@ class Justpics < Sinatra::Base
   end
 
   get "/:id" do
-    id = params[:id].to_s[0...40]
+    id = params[:id].to_s[/^[a-zA-Z0-9]*/]
     begin
-      file = AWS::S3::S3Object.find(id, BUCKET_NAME)
+      raise NotFound unless sha = expand_sha(id)
+      file = AWS::S3::S3Object.find(sha, BUCKET_NAME)
       content_type file.content_type
 
       response['Cache-Control'] = "public, max-age=#{60*60*24*356*3}"
@@ -57,10 +62,28 @@ class Justpics < Sinatra::Base
       response['Last-Modified'] = Time.at(1337).httpdate
 
       file.value
-    rescue AWS::S3::NoSuchKey
+    rescue AWS::S3::NoSuchKey, NotFound
       status 404
       "Not here"
     end
+  end
+
+  def find_short_key_for(key)
+    keys = get_keys_starting_with(key[0...MINIMUM_KEY_LENGTH]) - [key]
+    MINIMUM_KEY_LENGTH.upto(key.length) do |length|
+      candidate = key[0...length]
+      return candidate if keys.grep(/^#{candidate}/).empty?
+    end
+    key 
+  end
+
+  def get_keys_starting_with(key)
+    AWS::S3::Bucket.objects(BUCKET_NAME, :prefix => key).sort_by{|o| Date.parse(o.about["last-modified"]) }.map(&:key)
+  end
+
+  def expand_sha(small)
+    small = small.to_s[/^[a-fA-F0-9]*/]
+    get_keys_starting_with(small).first unless small.length < MINIMUM_KEY_LENGTH
   end
 
   class AlwaysFresh
@@ -69,7 +92,7 @@ class Justpics < Sinatra::Base
     end
 
     def call(env)
-      if (env["HTTP_IF_MODIFIED_SINCE"] or env["HTTP_IF_NONE_MATCH"]) and env["REQUEST_METHOD"] == "GET" and env["REQUEST_PATH"].length > 40
+      if (env["HTTP_IF_MODIFIED_SINCE"] or env["HTTP_IF_NONE_MATCH"]) and env["REQUEST_METHOD"] == "GET" and env["REQUEST_PATH"].length > MINIMUM_KEY_LENGTH
         [304, {}, []]
       else
         @app.call(env)
