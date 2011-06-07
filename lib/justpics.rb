@@ -7,6 +7,26 @@ AWS::S3::Base.establish_connection!(
   :secret_access_key => ENV["AMAZON_SECRET_ACCESS_KEY"]
 )
 
+
+class Justpics < Sinatra::Base
+end
+
+class Justpics::AlwaysFresh
+  def initialize(app)
+    @app = app
+  end
+
+  def call(env)
+    if (env["HTTP_IF_MODIFIED_SINCE"] or env["HTTP_IF_NONE_MATCH"]) and env["REQUEST_METHOD"] == "GET" and env["REQUEST_PATH"].length > Justpics::MINIMUM_KEY_LENGTH
+      puts "Quick 304"
+      [304, {}, []]
+    else
+      @app.call(env)
+    end
+  end
+end
+
+
 class Justpics < Sinatra::Base
   BUCKET_NAME = ENV['AMAZON_S3_BUCKET']
   MAX_SIZE = (ENV['JUSTPICS_MAX_SIZE'] || 2 * 1024 * 1024).to_i
@@ -19,8 +39,15 @@ class Justpics < Sinatra::Base
 
   enable :static, :methodoverride
 
+  use Justpics::AlwaysFresh
+
+  get '/favicon.ico' do
+    cache_forever
+    send_file File.expand_path("../../assets/favicon.ico", __FILE__)
+  end
+
   get POST_PATH do
-    File.read(File.expand_path("../../public/index.html", __FILE__))
+    File.read(File.expand_path("../../assets/index.html", __FILE__))
   end
 
   post POST_PATH do
@@ -99,19 +126,5 @@ class Justpics < Sinatra::Base
   def expand_sha(small)
     small = small.to_s[/^[a-fA-F0-9]*/]
     get_keys_starting_with(small).first unless small.length < MINIMUM_KEY_LENGTH
-  end
-
-  class AlwaysFresh
-    def initialize(app)
-      @app = app
-    end
-
-    def call(env)
-      if (env["HTTP_IF_MODIFIED_SINCE"] or env["HTTP_IF_NONE_MATCH"]) and env["REQUEST_METHOD"] == "GET" and env["REQUEST_PATH"].length > MINIMUM_KEY_LENGTH
-        [304, {}, []]
-      else
-        @app.call(env)
-      end
-    end
   end
 end

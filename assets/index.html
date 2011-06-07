@@ -1,0 +1,56 @@
+<html>
+<head>
+  <title>Justpics Image Uploader</title>
+  <style>
+    body{
+      font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+      font-weight: 200;
+      font-size: 13pt;
+      background: #999;
+    }
+    h1 {
+      font-weight: inherit;
+      font-size: 1.5em;
+    }
+    form, h1{
+      margin: 0 0 0.2em 0;
+    }
+    body > div {
+      margin: 10em auto;
+      width: 366px;
+    }
+    body > div > div {
+      background: #deebf5;
+      border: #fff solid 2px;
+      padding: 1em;
+      border-radius: 5px;
+      box-shadow: #000 2px 2px 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div>
+    <div>
+      <h1>Upload a Picture</h1>
+      <form method="post" enctype='multipart/form-data' action="" id="upload-form">
+        <input type="file" name="file" id="file-field" />
+        <input type="submit" id="submit-button" />
+      </form>
+    </div>
+  </div>
+
+
+  <script>
+    var file_field = document.getElementById("file-field"),
+    upload_form = document.getElementById("upload-form"),
+    submit_button = document.getElementById("submit-button");
+
+    file_field.onchange = function(){
+      upload_form.submit();
+    }
+    submit_button.style.display = "none";
+  
+  </script>
+</body>
+</html>
