@@ -46,6 +46,11 @@ class Justpics < Sinatra::Base
     send_file File.expand_path("../../assets/favicon.ico", __FILE__)
   end
 
+  get "/" do
+    status 404
+    render_default
+  end
+
   get POST_PATH do
     File.read(File.expand_path("../../assets/index.html", __FILE__))
   end
@@ -116,7 +121,7 @@ class Justpics < Sinatra::Base
       keys = keys.grep(/^#{candidate}/)
       return candidate if keys.empty?
     end
-    key 
+    key
   end
 
   def get_keys_starting_with(key)
