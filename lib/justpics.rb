@@ -1,11 +1,8 @@
 require 'sinatra/base'
+require 'enumerator'
 require 'digest/sha1'
 require 'aws/s3'
 
-AWS::S3::Base.establish_connection!(
-  :access_key_id     => ENV["AMAZON_ACCESS_KEY_ID"],
-  :secret_access_key => ENV["AMAZON_SECRET_ACCESS_KEY"]
-)
 
 
 class Justpics < Sinatra::Base
@@ -17,7 +14,7 @@ class Justpics::AlwaysFresh
   end
 
   def call(env)
-    if (env["HTTP_IF_MODIFIED_SINCE"] or env["HTTP_IF_NONE_MATCH"]) and env["REQUEST_METHOD"] == "GET" and env["REQUEST_PATH"].length > Justpics::MINIMUM_KEY_LENGTH
+    if (env["HTTP_IF_MODIFIED_SINCE"] or env["HTTP_IF_NONE_MATCH"]) and env["REQUEST_METHOD"] == "GET" and env["PATH_INFO"].try(:length) > Justpics::MINIMUM_KEY_LENGTH
       puts "Quick 304"
       [304, {}, []]
     else
@@ -36,6 +33,7 @@ class Justpics < Sinatra::Base
   MINIMUM_KEY_LENGTH <= 40 or raise ArgumentError, "JUSTPICS_MINIMUM_KEY_LENGTH cannot be bigger then the full key length (40)"
 
   NotFound = Class.new(RuntimeError)
+  S3 = AWS::S3.new
 
   enable :static, :methodoverride
 
@@ -68,14 +66,7 @@ class Justpics < Sinatra::Base
       return "File too large. Keep it under #{MAX_SIZE} bytes."
     end
 
-    id = Digest::SHA1.file(tmpfile.path).hexdigest
-
-    unless AWS::S3::S3Object.exists?(id, BUCKET_NAME)
-      AWS::S3::S3Object.store(id, tmpfile, BUCKET_NAME, :content_type => file[:type])
-    end
-
-    short_key = find_short_key_for(id)
-    resource_url = url("/#{short_key}")
+    resource_url = url upload_image(tmpfile.path, file[:type])
 
     if params[:media]
       "<mediaurl>#{resource_url}</mediaurl>"
@@ -103,10 +94,10 @@ class Justpics < Sinatra::Base
 
   def render_image(id)
     raise NotFound unless sha = expand_sha(id)
-    file = AWS::S3::S3Object.find(sha, BUCKET_NAME)
+    file = bucket.objects[sha]
     content_type file.content_type
-    Enumerable::Enumerator.new(file, :value)
-  rescue AWS::S3::NoSuchKey => e
+    Enumerator.new(file, :read)
+  rescue AWS::S3::Errors::NoSuchKey => e
     raise NotFound, e.message
   end
 
@@ -114,22 +105,49 @@ class Justpics < Sinatra::Base
     send_file File.expand_path('../../assets/default.png', __FILE__)
   end
 
-  def find_short_key_for(key)
-    keys = get_keys_starting_with(key[0...MINIMUM_KEY_LENGTH]) - [key]
-    MINIMUM_KEY_LENGTH.upto(key.length) do |length|
-      candidate = key[0...length]
-      keys = keys.grep(/^#{candidate}/)
-      return candidate if keys.empty?
-    end
-    key
-  end
-
-  def get_keys_starting_with(key)
-    AWS::S3::Bucket.objects(BUCKET_NAME, :prefix => key).sort_by{|o| Date.parse(o.about["last-modified"]) }.map(&:key)
-  end
-
   def expand_sha(small)
     small = small.to_s[/^[a-fA-F0-9]*/]
     get_keys_starting_with(small).first unless small.length < MINIMUM_KEY_LENGTH
   end
+
+  module UploadMethods
+    def bucket
+      @bucket ||= S3.buckets[BUCKET_NAME]
+    end
+
+    def upload_image(path, type = "application/octet-stream")
+      id = Digest::SHA1.file(path).hexdigest
+
+      unless bucket.objects[id].exists?
+        bucket.objects[id].write(
+          Pathname.new(path),
+          content_type: type,
+          cache_control: "public,max-age=999999999",
+          acl: :public_read,
+          content_disposition: :attachment
+        )
+      end
+
+      short_key = find_short_key_for(id)
+      "/#{short_key}"
+    end
+
+    def find_short_key_for(key)
+      keys = get_keys_starting_with(key[0...MINIMUM_KEY_LENGTH]) - [key]
+      MINIMUM_KEY_LENGTH.upto(key.length) do |length|
+        candidate = key[0...length]
+        keys = keys.grep(/^#{candidate}/)
+        return candidate if keys.empty?
+      end
+      key
+    end
+
+    def get_keys_starting_with(key)
+      bucket.objects.with_prefix(key).sort_by(&:last_modified).map(&:key)
+    end
+  end
+
+  extend UploadMethods
+  include UploadMethods
+
 end
